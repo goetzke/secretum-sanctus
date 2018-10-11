@@ -3,6 +3,14 @@ import sys
 import logging
 from datetime import datetime
 
+header = """
+   _____                     __                 _____                  __            
+  / ___/___  _____________  / /__   ______ ___ / ___/____ _____  _____/ /__   _______
+  \__ \/ _ \/ ___/ ___/ _ \/ __/ | / / __ `__ \\__ \/ __ `/ __ \/ ___/ __/ | / / ___/
+ ___/ /  __/ /__/ /  /  __/ /_ | |/ / / / / / /__/ / /_/ / / / / /__/ /_ | |/ (__  ) 
+/____/\___/\___/_/   \___/\__/ |___/_/ /_/ /_/____/\__,_/_/ /_/\___/\__/ |___/____/  
+
+"""
 
 MAX_ATTEMPTS = 5000
 
@@ -137,9 +145,10 @@ def main():
 
     # Log results if successful
     logger.info('~' * 80)
-    logger.info('Secretum Sanctus - {}'.format(now))
+    logger.info(header)
+    # logger.info('Participants: {}'.format(givers))
     logger.info('Participants: {}'.format(givers))
-    logger.info(pairings)
+    logger.info('Pairings: {}'.format(pairings))
     logger.info('~' * 80)
 
 
