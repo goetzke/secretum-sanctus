@@ -61,6 +61,27 @@ class Pair:
         return "%s ---> %s" % (self.giver.name, self.recipient.name)
 
 
+def build_participant_lists(participants=PEEPS, bad_pairs=BAD_PAIRS):
+    givers = []
+    for person in participants:
+        name = person['name']
+        email = person['email']
+
+        invalid_recipients = []
+        for pair in bad_pairs:
+            bad_couple = [n.strip() for n in pair.split(',')]
+            if name in bad_couple:
+                # Get other member of this couple
+                for member in bad_couple:
+                    if name != member:
+                        invalid_recipients.append(member)
+
+        person = Person(name, email, invalid_recipients)
+        givers.append(person)
+
+    return givers, givers[:]
+
+
 def select_recipient(giver, recipients):
     choice = random.choice(recipients)
     if giver.name == choice.name or choice.name in giver.invalid_recipients:
@@ -82,38 +103,7 @@ def create_pairs(givers, recipients):
     return pairs
 
 
-def main():
-
-    # Configure logging
-    now = datetime.today().strftime('%Y-%m-%d')
-    logpath = LOG_PATH.format(now=now)
-    configure_root_logger(LOG_LEVEL, logpath)
-    LOGGER = 'secretum-sanctus'
-    logger = logging.getLogger(LOGGER)
-
-    givers = []
-    for person in PEEPS:
-        name = person['name']
-        email = person['email']
-
-        invalid_recipients = []
-        for pair in BAD_PAIRS:
-            bad_couple = [n.strip() for n in pair.split(',')]
-            if name in bad_couple:
-                # Get other member of this couple
-                for member in bad_couple:
-                    if name != member:
-                        invalid_recipients.append(member)
-
-        person = Person(name, email, invalid_recipients)
-        givers.append(person)
-
-    recipients = givers[:]
-
-    logger.info('~' * 80)
-    logger.info('Secretum Sanctus - {}'.format(now))
-    logger.info('Participants: {}'.format(givers))
-
+def designate_recipients(givers, recipients):
     pairs = None
     attempts = 0
     while attempts < MAX_ATTEMPTS:
@@ -128,8 +118,28 @@ def main():
         sys.exit()
 
     pairings = '%s' % (", ".join([str(p) for p in pairs]))
-    logger.info(pairings)
 
+    return pairings
+
+
+def main():
+
+    # Configure logging
+    now = datetime.today().strftime('%Y-%m-%d')
+    logpath = LOG_PATH.format(now=now)
+    configure_root_logger(LOG_LEVEL, logpath)
+    LOGGER = 'secretum-sanctus'
+    logger = logging.getLogger(LOGGER)
+
+    # Attempt to match everyone
+    givers, recipients = build_participant_lists()
+    pairings = designate_recipients(givers, recipients)
+
+    # Log results if successful
+    logger.info('~' * 80)
+    logger.info('Secretum Sanctus - {}'.format(now))
+    logger.info('Participants: {}'.format(givers))
+    logger.info(pairings)
     logger.info('~' * 80)
 
 
