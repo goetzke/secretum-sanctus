@@ -8,9 +8,14 @@ MAX_ATTEMPTS = 5000
 
 PEEPS = [
     {'name': 'Luke', 'email': 'luke@gmail.com'},
+    {'name': 'Lily', 'email': 'lily@gmail.com'},
     {'name': 'Bruce', 'email': 'bruce@gmail.com'},
     {'name': 'Tony', 'email': 'tony@gmail.com'},
     {'name': 'Max', 'email': 'max@gmail.com'}
+]
+
+BAD_PAIRS = [
+    'Luke, Lily'
 ]
 
 LOG_FORMAT = '%(asctime)s | %(name)s | %(message)s'
@@ -38,9 +43,10 @@ def configure_root_logger(loglevel, logpath):
 
 
 class Person:
-    def __init__(self, name, email):
+    def __init__(self, name, email, invalid_recipients):
         self.name = name
         self.email = email
+        self.invalid_recipients = invalid_recipients
 
     def __repr__(self):
         return "%s <%s>" % (self.name, self.email)
@@ -57,7 +63,7 @@ class Pair:
 
 def select_recipient(giver, recipients):
     choice = random.choice(recipients)
-    if giver.name == choice.name:
+    if giver.name == choice.name or choice.name in giver.invalid_recipients:
         if len(recipients) is 1:
             raise Exception('Only one recipient left, try again')
         return select_recipient(giver, recipients)
@@ -89,7 +95,17 @@ def main():
     for person in PEEPS:
         name = person['name']
         email = person['email']
-        person = Person(name, email)
+
+        invalid_recipients = []
+        for pair in BAD_PAIRS:
+            bad_couple = [n.strip() for n in pair.split(',')]
+            if name in bad_couple:
+                # Get other member of this couple
+                for member in bad_couple:
+                    if name != member:
+                        invalid_recipients.append(member)
+
+        person = Person(name, email, invalid_recipients)
         givers.append(person)
 
     recipients = givers[:]
