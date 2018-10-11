@@ -1,9 +1,8 @@
 import random
 import sys
-import os
+import logging
+from datetime import datetime
 
-
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'config.yml')
 
 MAX_ATTEMPTS = 5000
 
@@ -13,6 +12,29 @@ PEEPS = [
     {'name': 'Tony', 'email': 'tony@gmail.com'},
     {'name': 'Max', 'email': 'max@gmail.com'}
 ]
+
+LOG_FORMAT = '%(asctime)s | %(name)s | %(message)s'
+LOG_LEVEL = logging.INFO
+LOG_PATH = 'secretum_sanctus_{now}.log'
+
+
+def configure_root_logger(loglevel, logpath):
+    # Logging Setup
+    root = logging.getLogger()
+    root.setLevel(loglevel)
+    formatter = logging.Formatter(LOG_FORMAT)
+
+    # Stream Handler
+    sh = logging.StreamHandler()
+    sh.setLevel(loglevel)
+    sh.setFormatter(formatter)
+    root.addHandler(sh)
+
+    # File Handler
+    fh = logging.FileHandler(logpath)
+    fh.setLevel(loglevel)
+    fh.setFormatter(formatter)
+    root.addHandler(fh)
 
 
 class Person:
@@ -56,6 +78,13 @@ def create_pairs(givers, recipients):
 
 def main():
 
+    # Configure logging
+    now = datetime.today().strftime('%Y-%m-%d')
+    logpath = LOG_PATH.format(now=now)
+    configure_root_logger(LOG_LEVEL, logpath)
+    LOGGER = 'secretum-sanctus'
+    logger = logging.getLogger(LOGGER)
+
     givers = []
     for person in PEEPS:
         name = person['name']
@@ -64,6 +93,10 @@ def main():
         givers.append(person)
 
     recipients = givers[:]
+
+    logger.info('~' * 80)
+    logger.info('Secretum Sanctus - {}'.format(now))
+    logger.info('Participants: {}'.format(givers))
 
     pairs = None
     attempts = 0
@@ -78,9 +111,10 @@ def main():
         print('Exceeded max attempts ({})!!!'.format(MAX_ATTEMPTS))
         sys.exit()
 
-    test_pairings = '%s' % ("\n".join([str(p) for p in pairs]))
+    pairings = '%s' % (", ".join([str(p) for p in pairs]))
+    logger.info(pairings)
 
-    print(test_pairings)
+    logger.info('~' * 80)
 
 
 if __name__ == "__main__":
