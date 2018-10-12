@@ -1,7 +1,12 @@
+import argparse
 import random
 import sys
 import logging
 from datetime import datetime
+import smtplib
+import pytz
+import time
+import socket
 
 header = """
    _____                     __                 _____                  __            
@@ -29,6 +34,36 @@ BAD_PAIRS = [
 LOG_FORMAT = '%(asctime)s | %(name)s | %(message)s'
 LOG_LEVEL = logging.INFO
 LOG_PATH = 'secretum_sanctus_{now}.log'
+
+EMAIL_MESSAGE = '''
+  Dear {giver},
+  
+  This year you are the Secret Santa for {recipient}. Have fun!
+  
+  The maximum spending limit this year is $50.
+  
+  Happy Holidays!
+  
+'''
+EMAIL_HEADER = """Date: {date}
+Content-Type: text/plain; charset="utf-8"
+Message-Id: {message_id}
+From: {frm}
+To: {to}
+Subject: {subject}
+
+"""
+EMAIL_CONFIG = {
+    'SMTP_SERVER': 'smtp.gmail.com',
+    'SMTP_PORT': 587,
+    'USERNAME': 'you@gmail.com',
+    'PASSWORD': 'your-password',
+    'TIMEZONE': 'US/Eastern',
+    'FROM': 'You <you@gmail.com>',
+    'SUBJECT': 'Your secret santa recipient is {recipient}',
+    'MESSAGE': EMAIL_MESSAGE,
+    'HEADER': EMAIL_HEADER
+}
 
 
 def configure_root_logger(loglevel, logpath):
@@ -125,12 +160,47 @@ def designate_recipients(givers, recipients):
         print('Exceeded max attempts ({})!!!'.format(MAX_ATTEMPTS))
         sys.exit()
 
-    pairings = '%s' % (", ".join([str(p) for p in pairs]))
+    return pairs
 
-    return pairings
+
+def send_emails(pairs, logger):
+    server = smtplib.SMTP(EMAIL_CONFIG['SMTP_SERVER'], EMAIL_CONFIG['SMTP_PORT'])
+    server.starttls()
+    server.login(EMAIL_CONFIG['USERNAME'], EMAIL_CONFIG['PASSWORD'])
+
+    for pair in pairs:
+        zone = pytz.timezone(EMAIL_CONFIG['TIMEZONE'])
+        now = zone.localize(datetime.now())
+        date = now.strftime('%a, %d %b %Y %T %Z')  # Sun, 21 Dec 2008 06:25:23 +0000
+        message_id = '<%s@%s>' % (str(time.time()) + str(random.random()), socket.gethostname())
+        frm = EMAIL_CONFIG['FROM']
+        to = pair.giver.email
+        subject = EMAIL_CONFIG['SUBJECT'].format(giver=pair.giver.name, recipient=pair.recipient.name)
+        body = (EMAIL_CONFIG['HEADER'] + EMAIL_CONFIG['MESSAGE']).format(
+            date=date,
+            message_id=message_id,
+            frm=frm,
+            to=to,
+            subject=subject,
+            giver=pair.giver.name,
+            recipient=pair.recipient.name,
+        )
+        result = server.sendmail(frm, [to], body)
+        logger.info('Emailed {} <{}>'.format(pair.giver.name, to))
+
+    server.quit()
 
 
 def main():
+    parser = argparse.ArgumentParser(prog="secretum_sanctus.py",
+                                     description="")
+    parser.add_argument('-e', '--email', required=False,
+                        help='send emails',
+                        action='store_true',
+                        dest='email',
+                        default=False)
+    args = parser.parse_args()
+    email = args.email
 
     # Configure logging
     now = datetime.today().strftime('%Y-%m-%d')
@@ -141,14 +211,17 @@ def main():
 
     # Attempt to match everyone
     givers, recipients = build_participant_lists()
-    pairings = designate_recipients(givers, recipients)
+    pairs = designate_recipients(givers, recipients)
 
     # Log results if successful
     logger.info('~' * 80)
     logger.info(header)
     # logger.info('Participants: {}'.format(givers))
     logger.info('Participants: {}'.format(givers))
-    logger.info('Pairings: {}'.format(pairings))
+    logger.info('Pairings: {}'.format(", ".join([str(p) for p in pairs])))
+    if email:
+        logger.info('Sending emails!')
+        send_emails(pairs, logger)
     logger.info('~' * 80)
 
 
