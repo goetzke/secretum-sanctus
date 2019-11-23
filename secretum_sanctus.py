@@ -21,14 +21,19 @@ MAX_ATTEMPTS = 5000
 
 PEEPS = [
     {'name': 'Luke', 'email': 'luke@gmail.com'},
-    {'name': 'Lily', 'email': 'lily@gmail.com'},
+    {'name': 'Liliana', 'email': 'liliana@gmail.com'},
     {'name': 'Bruce', 'email': 'bruce@gmail.com'},
     {'name': 'Tony', 'email': 'tony@gmail.com'},
     {'name': 'Max', 'email': 'max@gmail.com'}
 ]
 
+ADMINS = [
+    {'name': 'Judy', 'email': 'judy@gmail.com'}
+]
+
 BAD_PAIRS = [
-    'Luke, Lily'
+    'Luke, Liliana',
+    'Bruce, Tony'
 ]
 
 LOG_FORMAT = '%(asctime)s | %(name)s | %(message)s'
@@ -40,10 +45,22 @@ EMAIL_MESSAGE = '''
   
   This year you are the Secret Santa for {recipient}. Have fun!
   
-  The maximum spending limit this year is $50.
+  The maximum spending limit this year is $30.
   
   Happy Holidays!
   
+'''
+ADMIN_EMAIL_MESSAGE = '''
+  Dear {admin},
+
+  This year the Secret Santa pairs are:
+  
+{pairs}
+
+  The maximum spending limit this year is $30.
+
+  Happy Holidays!
+
 '''
 EMAIL_HEADER = """Date: {date}
 Content-Type: text/plain; charset="utf-8"
@@ -60,7 +77,7 @@ EMAIL_CONFIG = {
     'PASSWORD': 'your-password',
     'TIMEZONE': 'US/Eastern',
     'FROM': 'You <you@gmail.com>',
-    'SUBJECT': 'Your secret santa recipient is {recipient}',
+    'SUBJECT': 'Your secret santa recipient is...',
     'MESSAGE': EMAIL_MESSAGE,
     'HEADER': EMAIL_HEADER
 }
@@ -163,19 +180,26 @@ def designate_recipients(givers, recipients):
     return pairs
 
 
+def generate_email_metadata():
+    zone = pytz.timezone(EMAIL_CONFIG['TIMEZONE'])
+    now = zone.localize(datetime.now())
+    date = now.strftime('%a, %d %b %Y %T %Z')  # Sun, 21 Dec 2008 06:25:23 +0000
+    message_id = '<%s@%s>' % (str(time.time()) + str(random.random()), socket.gethostname())
+    frm = EMAIL_CONFIG['FROM']
+
+    return zone, now, date, message_id, frm
+
+
 def send_emails(pairs, logger):
     server = smtplib.SMTP(EMAIL_CONFIG['SMTP_SERVER'], EMAIL_CONFIG['SMTP_PORT'])
     server.starttls()
     server.login(EMAIL_CONFIG['USERNAME'], EMAIL_CONFIG['PASSWORD'])
 
+    # Send emails to each pair
     for pair in pairs:
-        zone = pytz.timezone(EMAIL_CONFIG['TIMEZONE'])
-        now = zone.localize(datetime.now())
-        date = now.strftime('%a, %d %b %Y %T %Z')  # Sun, 21 Dec 2008 06:25:23 +0000
-        message_id = '<%s@%s>' % (str(time.time()) + str(random.random()), socket.gethostname())
-        frm = EMAIL_CONFIG['FROM']
+        zone, now, date, message_id, frm = generate_email_metadata()
         to = pair.giver.email
-        subject = EMAIL_CONFIG['SUBJECT'].format(giver=pair.giver.name, recipient=pair.recipient.name)
+        subject = EMAIL_CONFIG['SUBJECT']
         body = (EMAIL_CONFIG['HEADER'] + EMAIL_CONFIG['MESSAGE']).format(
             date=date,
             message_id=message_id,
@@ -187,6 +211,23 @@ def send_emails(pairs, logger):
         )
         result = server.sendmail(frm, [to], body)
         logger.info('Emailed {} <{}>'.format(pair.giver.name, to))
+
+    # Send email to admins
+    for admin in ADMINS:
+        zone, now, date, message_id, frm = generate_email_metadata()
+        to = admin['email']
+        subject = "This year's Secret Santa pairs are..."
+        body = (EMAIL_CONFIG['HEADER'] + ADMIN_EMAIL_MESSAGE).format(
+            date=date,
+            message_id=message_id,
+            frm=frm,
+            to=to,
+            subject=subject,
+            admin=admin['name'],
+            pairs="\t"+"\n\t".join([str(p) for p in pairs]),
+        )
+        result = server.sendmail(frm, [to], body)
+        logger.info('Emailed {} <{}>'.format(admin['name'], to))
 
     server.quit()
 
@@ -216,9 +257,9 @@ def main():
     # Log results if successful
     logger.info('~' * 80)
     logger.info(header)
-    # logger.info('Participants: {}'.format(givers))
     logger.info('Participants: {}'.format(givers))
-    logger.info('Pairings: {}'.format(", ".join([str(p) for p in pairs])))
+    pairings = ", ".join([str(p) for p in pairs])
+    logger.info('Pairings: {}'.format(pairings))
     if email:
         logger.info('Sending emails!')
         send_emails(pairs, logger)
